@@ -1,9 +1,15 @@
-﻿// Offline shell for the Ti60 BLE console. Bump VERSION when shipping new files.
-// 鐩爣锛氳鍒颁富灞忓悗锛屾墜鏈哄湪鏃犵綉缁滅殑灞曚細鐜板満涔熻兘鐩存帴鎵撳紑骞惰繛钃濈墮锛圔LE 鏄湰鍦板崗璁紝涓嶉渶瑕佺綉缁滐級銆?'use strict';
+// Offline shell for the Ti60 BLE console.
+// NOTE: keep this file ASCII-only. A previous copy went through PowerShell
+// Get-Content/Set-Content and got double-encoded (GBK<->UTF-8), which made
+// Chrome reject it with "ServiceWorker script evaluation failed".
+// Bump VERSION whenever app.js / app.css / *.html change.
+'use strict';
 
-const VERSION = 'ti60-ble-v6-exp';
+const VERSION = 'ti60-ble-v7-clean';
 
-// 妗岄潰椤典笌鎵嬫満椤靛悇鑷槸鐙珛鍏ュ彛锛屼袱涓兘瑕侀缂撳瓨锛屽惁鍒欑绾挎椂鍙兘鎷垮埌鍏朵腑涓€涓€?const SHELL = [
+// Both entry pages must be precached, otherwise an offline launch can only
+// reach one of them.
+const SHELL = [
   './',
   './index.html',
   './index_mobile.html',
@@ -20,7 +26,8 @@ const VERSION = 'ti60-ble-v6-exp';
   './icons/favicon.svg',
 ];
 
-// 绂荤嚎鏃剁殑鍏滃簳椤碉細鎸夎姹傝矾寰勫垽鏂鍥炴闈㈤〉杩樻槸鎵嬫満椤?function fallbackFor(pathname) {
+// Offline fallback page: pick the mobile entry for mobile-ish paths.
+function fallbackFor(pathname) {
   return /mobile/i.test(pathname) ? './index_mobile.html' : './index.html';
 }
 
@@ -47,7 +54,9 @@ self.addEventListener('fetch', event => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // 椤甸潰瀵艰埅锛氬厛璧扮綉缁滄嬁鏈€鏂扮増锛屽け璐ユ椂鍥為€€鍒般€屽悓涓€涓〉闈€嶇殑缂撳瓨锛?  // 鑰屼笉鏄竴寰嬪洖 index.html鈥斺€斿惁鍒欐墜鏈虹绂荤嚎浼氭墦寮€妗岄潰鐗堥〉闈€?  if (req.mode === 'navigate') {
+  // Navigations: network first so a fresh deploy is picked up; fall back to the
+  // cache of the SAME page (not always index.html) when offline.
+  if (req.mode === 'navigate') {
     event.respondWith((async () => {
       try {
         const fresh = await fetch(req);
@@ -64,7 +73,8 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 闈欐€佽祫婧愶細缂撳瓨浼樺厛锛屽悗鍙伴『渚挎洿鏂?  event.respondWith((async () => {
+  // Static assets: cache first, refresh in the background.
+  event.respondWith((async () => {
     const cached = await caches.match(req);
     const network = fetch(req).then(res => {
       if (res.ok) {
